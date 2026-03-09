@@ -5,11 +5,11 @@ import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
-  { icon: Activity, label: 'Oportunidades', path: '/' },
+  { icon: Activity, label: 'Live Scanner', path: '/' },
   { icon: Calculator, label: 'Calculadora', path: '/calculator' },
   { icon: Bell, label: 'Meus Alertas', path: '/alerts' },
   { icon: TrendingUp, label: 'Relatórios', path: '/reports' },
-  { icon: ShieldAlert, label: 'Admin (Scanner)', path: '/admin' },
+  { icon: ShieldAlert, label: 'Admin (Motor)', path: '/admin' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
 
@@ -17,24 +17,24 @@ export function Sidebar() {
   const { profile, signOut } = useAuth();
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col shadow-sm z-10">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm shadow-indigo-200">
-          <Activity className="text-white w-5 h-5" />
+    <aside className="w-64 bg-[#111111] border-r border-[#222] h-screen flex flex-col z-10">
+      <div className="p-6 flex items-center gap-3 border-b border-[#222]">
+        <div className="w-8 h-8 rounded-lg bg-[#b1f038] flex items-center justify-center shadow-[0_0_15px_rgba(177,240,56,0.2)]">
+          <Activity className="text-black w-5 h-5" strokeWidth={2.5} />
         </div>
-        <span className="text-slate-900 font-extrabold text-xl tracking-tight">Surebet<span className="text-indigo-600">Pro</span></span>
+        <span className="text-white font-extrabold text-xl tracking-tight">Surebet<span className="text-[#b1f038]">Pro</span></span>
       </div>
       
-      <nav className="flex-1 px-4 space-y-1.5 mt-4">
+      <nav className="flex-1 px-3 py-6 space-y-1.5">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => clsx(
-              "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+              "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200",
               isActive 
-                ? "bg-indigo-50 text-indigo-700" 
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                ? "bg-[#b1f038]/10 text-[#b1f038]" 
+                : "text-gray-400 hover:bg-[#1a1a1a] hover:text-white"
             )}
           >
             <item.icon className={clsx("w-5 h-5", "transition-colors")} />
@@ -43,12 +43,12 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-200 space-y-4 bg-slate-50/50">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-1 truncate font-medium">{profile?.email}</div>
-          <div className="text-sm font-bold text-slate-900 mb-3 capitalize">Plano {profile?.plan || 'Free'}</div>
+      <div className="p-4 border-t border-[#222] space-y-4 bg-[#0a0a0a]/50">
+        <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4">
+          <div className="text-xs text-gray-500 mb-1 truncate font-medium">{profile?.email}</div>
+          <div className="text-sm font-bold text-white mb-3 capitalize">Plano {profile?.plan || 'Free'}</div>
           {profile?.plan === 'free' && (
-            <button className="w-full py-2 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 text-slate-700 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+            <button className="w-full py-2 bg-[#222] hover:bg-[#333] text-white text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-[#b1f038]">
               Fazer Upgrade
             </button>
           )}
@@ -56,7 +56,7 @@ export function Sidebar() {
         
         <button 
           onClick={signOut}
-          className="flex items-center gap-3 px-4 py-2 w-full rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+          className="flex items-center gap-3 px-4 py-2 w-full rounded-xl text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
         >
           <LogOut className="w-5 h-5" />
           Sair da conta
