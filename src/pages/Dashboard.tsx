@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Loader2, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { OpportunityCard, OpportunityCardSkeleton } from '../components/OpportunityCard';
+import { CalculatorModal } from '../components/CalculatorModal';
 
 interface SurebetLeg {
   id: string;
@@ -34,7 +34,10 @@ export function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  
+  // Modal State
+  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOpportunities();
@@ -95,6 +98,14 @@ export function Dashboard() {
     return eventName.includes(search) || leagueName.includes(search);
   });
 
+  const handleOpenCalculator = (id: string) => {
+    const opp = opportunities.find(o => o.id === id);
+    if (opp) {
+      setSelectedOpportunity(opp);
+      setIsModalOpen(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-6 md:p-10">
       <div className="w-full max-w-7xl mx-auto">
@@ -112,16 +123,16 @@ export function Dashboard() {
                 placeholder="Buscar times ou campeonatos..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#161618] border border-[#2c2e33] text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#b1f038] focus:border-transparent transition-all placeholder-[#4a4d55]"
+                className="w-full bg-[#161618] border border-[#2c2e33] text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#39FF14] focus:border-transparent transition-all placeholder-[#4a4d55]"
               />
             </div>
           </div>
         </div>
 
-        {/* Content Section */}
+        {/* Content Section - Agora com 2 colunas em telas grandes (xl:grid-cols-2) */}
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map(i => <OpportunityCardSkeleton key={i} />)}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map(i => <OpportunityCardSkeleton key={i} />)}
           </div>
         ) : filteredBets.length === 0 ? (
           <div className="bg-[#161618] border border-[#2c2e33] rounded-2xl p-16 text-center shadow-lg">
@@ -134,7 +145,7 @@ export function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filteredBets.map((bet) => (
               <OpportunityCard
                 key={bet.id}
@@ -151,12 +162,20 @@ export function Dashboard() {
                   outcome: leg.outcome_name,
                   price: leg.price
                 }))}
-                onCalculate={(id) => navigate(`/calculator?id=${id}`)}
+                onCalculate={handleOpenCalculator}
+                fullData={bet}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Modal da Calculadora */}
+      <CalculatorModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        opportunity={selectedOpportunity} 
+      />
     </div>
   );
 }

@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { Calculator } from './pages/Calculator';
+import { Strategy } from './pages/Strategy';
+import { Alerts } from './pages/Alerts';
+import { Reports } from './pages/Reports';
 import { Admin } from './pages/Admin';
 import { Auth } from './pages/Auth';
 import { Settings } from './pages/Settings';
@@ -15,7 +18,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-[#0a0a0a]">
-        <Loader2 className="w-8 h-8 text-[#b1f038] animate-spin" />
+        <Loader2 className="w-8 h-8 text-[#39FF14] animate-spin" />
       </div>
     );
   }
@@ -40,16 +43,17 @@ function AppRoutes() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden selection:bg-[#b1f038]/30 selection:text-[#b1f038]">
+    <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden selection:bg-[#39FF14]/30 selection:text-[#39FF14]">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto relative">
         <Routes>
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/calculator" element={<ProtectedRoute><Calculator /></ProtectedRoute>} />
+          <Route path="/strategy" element={<ProtectedRoute><Strategy /></ProtectedRoute>} />
+          <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/alerts" element={<ProtectedRoute><div className="p-8 text-gray-400">Página de Alertas em desenvolvimento...</div></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><div className="p-8 text-gray-400">Relatórios em desenvolvimento...</div></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

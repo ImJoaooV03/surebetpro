@@ -1,7 +1,9 @@
-import React from 'react';
-import { TrendingUp, Plus, Info, Calculator, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, Plus, Info, Calculator, AlertTriangle, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface OpportunityCardProps {
   id: string;
@@ -18,6 +20,7 @@ export interface OpportunityCardProps {
     price: number;
   }[];
   onCalculate: (id: string) => void;
+  fullData?: any; // Para passar para o modal
 }
 
 export function OpportunityCardSkeleton() {
@@ -70,10 +73,13 @@ export function OpportunityCard({
   homeTeam,
   awayTeam,
   legs,
-  onCalculate
+  onCalculate,
+  fullData
 }: OpportunityCardProps) {
+  const { user } = useAuth();
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
   
-  // Helper para pegar as iniciais dos times
   const getInitials = (name: string) => {
     return name.substring(0, 2).toUpperCase();
   };
@@ -82,23 +88,44 @@ export function OpportunityCard({
     ? format(new Date(date), "dd/MM/yyyy, HH:mm", { locale: ptBR })
     : '--/--/----, --:--';
 
+  const handleAddToStrategy = async () => {
+    if (!user) return;
+    setAdding(true);
+    try {
+      const { error } = await supabase.from('user_strategies').insert({
+        user_id: user.id,
+        opportunity_id: id,
+        status: 'pending'
+      });
+      if (error) throw error;
+      setAdded(true);
+      setTimeout(() => setAdded(false), 3000);
+    } catch (error) {
+      console.error("Erro ao adicionar à estratégia:", error);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <article 
       className="bg-[#161618] border border-[#2c2e33] rounded-2xl p-5 w-full flex flex-col gap-4 shadow-lg hover:shadow-2xl hover:border-[#3f424a] hover:-translate-y-1 transition-all duration-300 group"
-      aria-label={`Oportunidade de arbitragem em ${homeTeam} vs ${awayTeam}`}
     >
       {/* Header Row */}
       <div className="flex justify-between items-center">
-        <div className="bg-[#b1f038] text-black px-3.5 py-1.5 rounded-full font-extrabold text-[13px] flex items-center gap-1.5 shadow-[0_0_10px_rgba(177,240,56,0.2)]">
+        <div className="bg-[#39FF14] text-black px-3.5 py-1.5 rounded-full font-extrabold text-[13px] flex items-center gap-1.5 shadow-[0_0_10px_rgba(57,255,20,0.3)]">
           <TrendingUp className="w-4 h-4" strokeWidth={2.5} />
           LUCRO {Number(roi).toFixed(2)}%
         </div>
         <button 
-          className="text-[#b1f038] hover:text-[#c4f55b] text-sm font-semibold flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#b1f038] focus:ring-offset-2 focus:ring-offset-[#161618] rounded-md px-2 py-1"
-          aria-label="Adicionar à Estratégia"
+          onClick={handleAddToStrategy}
+          disabled={adding || added}
+          className={`text-sm font-semibold flex items-center gap-1.5 transition-colors focus:outline-none rounded-md px-2 py-1 ${
+            added ? 'text-emerald-400' : 'text-[#39FF14] hover:text-[#6BFF4D]'
+          }`}
         >
-          <Plus className="w-4 h-4" strokeWidth={2.5} />
-          Adicionar à Estratégia
+          {added ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <Plus className="w-4 h-4" strokeWidth={2.5} />}
+          {added ? 'Adicionado' : adding ? 'Adicionando...' : 'Adicionar à Estratégia'}
         </button>
       </div>
 
@@ -115,10 +142,8 @@ export function OpportunityCard({
 
       {/* Teams Section */}
       <div className="flex flex-col gap-3.5 relative mt-1">
-        {/* Linha conectora visual (opcional, sutil) */}
         <div className="absolute left-4 top-8 bottom-8 w-px bg-[#2c2e33] -z-0"></div>
 
-        {/* Home Team */}
         <div className="flex items-center gap-3 relative z-10">
           <div className="w-8 h-8 rounded-full bg-[#3a2525] border border-[#4a2f2f] flex items-center justify-center text-[#ff6b6b] text-xs font-bold shadow-sm">
             {getInitials(homeTeam)}
@@ -128,7 +153,6 @@ export function OpportunityCard({
           </h3>
         </div>
 
-        {/* Away Team */}
         <div className="flex items-center gap-3 relative z-10">
           <div className="w-8 h-8 rounded-full bg-[#252a3a] border border-[#2f364a] flex items-center justify-center text-[#6b8eff] text-xs font-bold shadow-sm">
             {getInitials(awayTeam)}
@@ -151,7 +175,7 @@ export function OpportunityCard({
                 {leg.outcome}
               </span>
             </div>
-            <div className="bg-[#2d3827] border border-[#3d4a35] text-[#b1f038] px-3 py-1.5 rounded-lg font-bold text-sm min-w-[64px] text-center shadow-sm group-hover/odd:bg-[#36442f] transition-colors">
+            <div className="bg-[#1a2e15] border border-[#2a4a22] text-[#39FF14] px-3 py-1.5 rounded-lg font-bold text-sm min-w-[64px] text-center shadow-sm group-hover/odd:bg-[#223d1c] transition-colors">
               {Number(leg.price).toFixed(3)}
             </div>
           </div>
@@ -168,13 +192,13 @@ export function OpportunityCard({
         <div className="flex flex-col sm:flex-row gap-3">
           <button 
             onClick={() => onCalculate(id)}
-            className="flex-1 bg-[#b1f038] text-black rounded-xl py-3 text-[13px] font-extrabold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(177,240,56,0.15)] hover:shadow-[0_0_25px_rgba(177,240,56,0.3)] hover:bg-[#c4f55b] transition-all focus:outline-none focus:ring-2 focus:ring-[#b1f038] focus:ring-offset-2 focus:ring-offset-[#161618]"
+            className="flex-1 bg-[#39FF14] text-black rounded-xl py-3 text-[13px] font-extrabold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(57,255,20,0.2)] hover:shadow-[0_0_25px_rgba(57,255,20,0.4)] hover:bg-[#6BFF4D] transition-all focus:outline-none focus:ring-2 focus:ring-[#39FF14] focus:ring-offset-2 focus:ring-offset-[#161618]"
           >
             <Calculator className="w-4 h-4" strokeWidth={2.5} />
             CALCULAR <span className="bg-black/10 px-1.5 py-0.5 rounded ml-1">{Number(roi).toFixed(2)}%</span>
           </button>
           
-          <button className="flex-1 border border-[#b1f038] text-[#b1f038] rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-[#b1f038]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#b1f038] focus:ring-offset-2 focus:ring-offset-[#161618]">
+          <button className="flex-1 border border-[#39FF14] text-[#39FF14] rounded-xl py-3 text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-[#39FF14]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#39FF14] focus:ring-offset-2 focus:ring-offset-[#161618]">
             <AlertTriangle className="w-4 h-4" strokeWidth={2.5} />
             Verificar Limitação
           </button>
