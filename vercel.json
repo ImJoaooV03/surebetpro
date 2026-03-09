@@ -1,7 +1,7 @@
 {
   "framework": "vite",
-  "installCommand": "yarn install",
-  "buildCommand": "yarn build",
+  "installCommand": "rm -rf node_modules yarn.lock package-lock.json && npm install",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {
