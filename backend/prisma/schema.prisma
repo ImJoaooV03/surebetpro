@@ -1,0 +1,140 @@
+// backend/prisma/schema.prisma
+// Schema completo para a plataforma de Arbitragem
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscription  Subscription?
+  alerts        Alert[]
+  apiLogs       ApiLog[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  plan      PlanType @default(FREE)
+  status    SubStatus @default(ACTIVE)
+  expiresAt DateTime?
+}
+
+enum PlanType {
+  FREE
+  PRO
+  PREMIUM
+}
+
+enum SubStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+model Sport {
+  key         String    @id // ex: soccer_epl
+  group       String    // ex: Soccer
+  title       String    // ex: EPL
+  description String
+  active      Boolean   @default(true)
+  events      Event[]
+}
+
+model Event {
+  id           String    @id // ID da Odds API
+  sportKey     String
+  sport        Sport     @relation(fields: [sportKey], references: [key])
+  homeTeam     String
+  awayTeam     String
+  commenceTime DateTime
+  markets      Market[]
+  surebets     SurebetOpportunity[]
+}
+
+model Bookmaker {
+  key    String  @id // ex: superbet, novibet
+  title  String
+  active Boolean @default(true)
+  odds   Odds[]
+}
+
+model Market {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  key       String   // ex: h2h, spreads, totals
+  lastUpdate DateTime
+  odds      Odds[]
+
+  @@unique([eventId, key])
+}
+
+model Odds {
+  id           String    @id @default(uuid())
+  marketId     String
+  market       Market    @relation(fields: [marketId], references: [id])
+  bookmakerKey String
+  bookmaker    Bookmaker @relation(fields: [bookmakerKey], references: [key])
+  name         String    // ex: Team A, Over 2.5
+  price        Float
+  timestamp    DateTime  @default(now())
+  
+  surebetLegs  SurebetLeg[]
+}
+
+model SurebetOpportunity {
+  id          String       @id @default(uuid())
+  eventId     String
+  event       Event        @relation(fields: [eventId], references: [id])
+  marketKey   String
+  roi         Float        // Porcentagem de lucro
+  createdAt   DateTime     @default(now())
+  active      Boolean      @default(true)
+  legs        SurebetLeg[]
+}
+
+model SurebetLeg {
+  id           String             @id @default(uuid())
+  surebetId    String
+  surebet      SurebetOpportunity @relation(fields: [surebetId], references: [id])
+  oddsId       String
+  odds         Odds               @relation(fields: [oddsId], references: [id])
+  stakePercent Float              // Porcentagem da banca alocada para esta perna
+}
+
+model Alert {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  minRoi    Float
+  sports    String[] // Array de sport keys
+  markets   String[]
+  createdAt DateTime @default(now())
+}
+
+model ApiLog {
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  endpoint     String
+  requestsUsed Int
+  timestamp    DateTime @default(now())
+}
