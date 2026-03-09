@@ -144,70 +144,76 @@ export function Dashboard() {
             const leg1 = bet.surebet_legs[0];
             const leg2 = bet.surebet_legs[1];
 
+            // Formatação de data limpa (ex: "10 mar, 18:46")
+            const formattedDate = bet.events?.commence_time 
+              ? format(new Date(bet.events.commence_time), "dd MMM, HH:mm", { locale: ptBR }).replace('.', '')
+              : 'Data Indisponível';
+
             return (
               <div 
                 key={bet.id} 
-                className="bg-dark-800 border border-dark-700 rounded-xl p-5 flex flex-col hover:-translate-y-1 hover:shadow-xl hover:border-dark-600 transition-all duration-200 group"
+                className="bg-dark-800 border border-dark-700 rounded-2xl p-5 flex flex-col hover:border-dark-600 hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 group"
               >
                 {/* Card Header: League & ROI */}
                 <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                    <span className="text-xs font-medium text-gray-300 truncate" title={bet.events?.league_title || bet.events?.sport_key}>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <Trophy className="w-[18px] h-[18px] text-yellow-500 flex-shrink-0" />
+                    <span className="text-[15px] font-medium truncate" title={bet.events?.league_title || bet.events?.sport_key}>
                       {bet.events?.league_title || bet.events?.sport_key || 'Desconhecido'}
                     </span>
                     {isNew && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-brand-600 text-white rounded-full animate-pulse flex-shrink-0">
+                      <span className="ml-2 px-2 py-0.5 text-[10px] font-bold bg-brand-600 text-white rounded-full animate-pulse flex-shrink-0">
                         NOVO
                       </span>
                     )}
                   </div>
                   <div className="flex-shrink-0 ml-4">
-                    <span className="text-lg font-black text-profit-400">
+                    <span className="text-xl font-bold text-profit-400">
                       {Number(bet.roi).toFixed(2)}%
                     </span>
                   </div>
                 </div>
 
                 {/* Card Body: Event Info */}
-                <div className="mb-5">
-                  <h3 className="text-lg font-bold text-white leading-tight mb-1.5 line-clamp-2" title={`${bet.events?.home_team} vs ${bet.events?.away_team}`}>
+                <div className="mb-6">
+                  <h3 className="text-[22px] font-bold text-white leading-tight mb-2 tracking-tight line-clamp-2" title={`${bet.events?.home_team} vs ${bet.events?.away_team}`}>
                     {bet.events?.home_team} vs {bet.events?.away_team}
                   </h3>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>
-                      {bet.events?.commence_time ? format(new Date(bet.events.commence_time), "dd MMM, HH:mm", { locale: ptBR }) : 'Data Indisponível'}
-                    </span>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <span>{formattedDate}</span>
                     <span className="w-1 h-1 rounded-full bg-dark-600"></span>
-                    <span className="px-2 py-0.5 rounded bg-dark-700 text-gray-300 uppercase tracking-wider truncate max-w-[180px]" title={bet.market_key}>
+                    <span className="px-2.5 py-1 rounded-md bg-dark-700/50 text-gray-300 text-xs font-medium uppercase tracking-wider truncate max-w-[200px]" title={bet.market_key}>
                       {bet.market_key}
                     </span>
                   </div>
                 </div>
 
-                {/* Card Odds Comparison */}
-                <div className="bg-dark-900/50 rounded-lg p-3.5 flex items-center justify-between border border-dark-700/50 mb-5 mt-auto">
+                {/* Card Odds Comparison (Darker Inner Box) */}
+                <div className="bg-dark-900 rounded-xl p-4 flex items-center justify-between mb-5 border border-dark-700/50 mt-auto">
                   {/* Leg 1 */}
-                  <div className="flex flex-col w-[40%]">
-                    <span className="text-[10px] text-gray-500 uppercase font-bold mb-0.5 truncate">{leg1?.bookmaker}</span>
-                    <span className="text-sm font-medium text-gray-300 truncate" title={leg1?.outcome_name}>{leg1?.outcome_name}</span>
-                    <span className="text-xl font-bold text-white mt-1">{Number(leg1?.price).toFixed(2)}</span>
+                  <div className="flex flex-col w-[42%]">
+                    <span className="text-[11px] text-gray-500 uppercase font-bold tracking-wider mb-0.5 truncate">{leg1?.bookmaker}</span>
+                    <span className="text-[15px] text-gray-300 truncate" title={leg1?.outcome_name}>{leg1?.outcome_name}</span>
+                    <span className="text-[28px] font-bold text-white mt-1 leading-none">{Number(leg1?.price).toFixed(2)}</span>
                   </div>
                   
-                  <div className="text-[10px] font-bold text-dark-500 uppercase tracking-widest px-2">VS</div>
+                  {/* VS Badge */}
+                  <div className="text-sm font-bold text-gray-500 lowercase px-2">
+                    vs
+                  </div>
 
                   {/* Leg 2 */}
-                  <div className="flex flex-col w-[40%] text-right">
-                    <span className="text-[10px] text-gray-500 uppercase font-bold mb-0.5 truncate">{leg2?.bookmaker}</span>
-                    <span className="text-sm font-medium text-gray-300 truncate" title={leg2?.outcome_name}>{leg2?.outcome_name}</span>
-                    <span className="text-xl font-bold text-white mt-1">{Number(leg2?.price).toFixed(2)}</span>
+                  <div className="flex flex-col w-[42%] text-right">
+                    <span className="text-[11px] text-gray-500 uppercase font-bold tracking-wider mb-0.5 truncate">{leg2?.bookmaker}</span>
+                    <span className="text-[15px] text-gray-300 truncate" title={leg2?.outcome_name}>{leg2?.outcome_name}</span>
+                    <span className="text-[28px] font-bold text-white mt-1 leading-none">{Number(leg2?.price).toFixed(2)}</span>
                   </div>
                 </div>
 
-                {/* Card Action */}
+                {/* Card Action Button */}
                 <button 
                   onClick={() => navigate(`/calculator?id=${bet.id}`)}
-                  className="w-full bg-dark-700 hover:bg-brand-600 text-white py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-dark-600 hover:border-brand-500"
+                  className="w-full bg-transparent border border-dark-600 hover:bg-dark-700 hover:border-dark-500 text-gray-300 hover:text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
                 >
                   <Calculator className="w-4 h-4" />
                   Calcular Arbitragem
