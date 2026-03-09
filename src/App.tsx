@@ -9,14 +9,13 @@ import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
-// Componente para proteger rotas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-dark-900">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
       </div>
     );
   }
@@ -41,7 +40,7 @@ function AppRoutes() {
   }
 
   return (
-    <div className="flex h-screen bg-dark-900 text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <Routes>
@@ -49,8 +48,8 @@ function AppRoutes() {
           <Route path="/calculator" element={<ProtectedRoute><Calculator /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/alerts" element={<ProtectedRoute><div className="p-8 text-gray-400">Página de Alertas em desenvolvimento...</div></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><div className="p-8 text-gray-400">Relatórios em desenvolvimento...</div></ProtectedRoute>} />
+          <Route path="/alerts" element={<ProtectedRoute><div className="p-8 text-slate-500">Página de Alertas em desenvolvimento...</div></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><div className="p-8 text-slate-500">Relatórios em desenvolvimento...</div></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

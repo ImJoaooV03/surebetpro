@@ -12,7 +12,6 @@ export function Admin() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [injecting, setInjecting] = useState(false);
 
-  // Carrega a chave salva no banco de dados ao iniciar
   useEffect(() => {
     fetchGlobalApiKey();
   }, []);
@@ -27,7 +26,7 @@ export function Admin() {
 
       if (!error && data?.odds_api_key) {
         setApiKey(data.odds_api_key);
-        await validateApiKey(data.odds_api_key, false); // Valida sem salvar novamente
+        await validateApiKey(data.odds_api_key, false);
       }
     } catch (error) {
       console.error("Erro ao buscar chave da API:", error);
@@ -38,7 +37,6 @@ export function Admin() {
 
   const validateApiKey = async (keyToTest: string, shouldSaveToDb: boolean = true) => {
     const cleanKey = keyToTest.trim(); 
-    
     if (!cleanKey) return;
 
     if (cleanKey.length < 20) {
@@ -72,14 +70,11 @@ export function Admin() {
       setStatus('success');
       setApiKey(cleanKey);
 
-      // Salva no banco de dados globalmente para o robô ler
       if (shouldSaveToDb) {
         await supabase.from('system_settings').update({ odds_api_key: cleanKey }).eq('id', 1);
       }
 
     } catch (error: any) {
-      console.error("Erro detalhado da API:", error);
-      
       if (error.message === 'Unauthorized') {
         setStatus('error');
         setUsage({ used: 0, remaining: 0 });
@@ -88,7 +83,6 @@ export function Admin() {
         setStatus('success');
         setApiKey(cleanKey);
         setErrorMessage('');
-        
         if (shouldSaveToDb) {
           await supabase.from('system_settings').update({ odds_api_key: cleanKey }).eq('id', 1);
         }
@@ -106,19 +100,16 @@ export function Admin() {
     try {
       const eventId = `mock_${Date.now()}`;
       
-      // 1. Inserir Evento Fictício
       const { error: eventError } = await supabase.from('events').insert({
         id: eventId,
         sport_key: 'soccer',
         league_title: '🏆 Champions League (Exemplo)',
         home_team: 'Real Madrid',
         away_team: 'Barcelona',
-        commence_time: new Date(Date.now() + 86400000).toISOString() // Jogo para amanhã
+        commence_time: new Date(Date.now() + 86400000).toISOString()
       });
-      
       if (eventError) throw eventError;
 
-      // 2. Inserir Oportunidade de Arbitragem
       const { data: opp, error: oppError } = await supabase.from('surebet_opportunities').insert({
         event_id: eventId,
         market_key: 'totals (Mais/Menos 2.5)',
@@ -126,32 +117,16 @@ export function Admin() {
         profit: 4.94,
         is_active: true
       }).select().single();
-
       if (oppError || !opp) throw oppError;
 
-      // 3. Inserir as Pernas (Legs) da Aposta
       const { error: legsError } = await supabase.from('surebet_legs').insert([
-        {
-          opportunity_id: opp.id,
-          outcome_name: 'Mais de 2.5 Gols',
-          bookmaker: 'superbet',
-          price: 2.15,
-          stake_percentage: 48.83
-        },
-        {
-          opportunity_id: opp.id,
-          outcome_name: 'Menos de 2.5 Gols',
-          bookmaker: 'novibet',
-          price: 2.05,
-          stake_percentage: 51.17
-        }
+        { opportunity_id: opp.id, outcome_name: 'Mais de 2.5 Gols', bookmaker: 'superbet', price: 2.15, stake_percentage: 48.83 },
+        { opportunity_id: opp.id, outcome_name: 'Menos de 2.5 Gols', bookmaker: 'novibet', price: 2.05, stake_percentage: 51.17 }
       ]);
-
       if (legsError) throw legsError;
 
-      alert('✅ Surebet de teste injetada com sucesso! Volte ao Painel de Oportunidades para ver e testar a calculadora.');
+      alert('✅ Surebet de teste injetada com sucesso! Volte ao Painel de Oportunidades.');
     } catch (error: any) {
-      console.error('Erro ao injetar mock:', error);
       alert(`Erro ao injetar: ${error.message}`);
     } finally {
       setInjecting(false);
@@ -162,124 +137,124 @@ export function Admin() {
   const usagePercentage = totalRequests > 0 ? (usage.used / totalRequests) * 100 : 0;
 
   if (loadingInitial) {
-    return <div className="p-8 flex justify-center"><Loader2 className="w-8 h-8 text-brand-500 animate-spin" /></div>;
+    return <div className="p-10 flex justify-center"><Loader2 className="w-10 h-10 text-indigo-600 animate-spin" /></div>;
   }
 
   return (
-    <div className="p-8 w-full max-w-7xl mx-auto pb-24">
-      <h1 className="text-2xl font-bold text-white mb-2">Painel de Administração</h1>
-      <p className="text-gray-400 text-sm mb-8">Monitoramento do Motor de Arbitragem e Configurações de API.</p>
+    <div className="p-6 md:p-10 w-full max-w-7xl mx-auto pb-24">
+      <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Painel de Administração</h1>
+      <p className="text-slate-500 text-sm font-medium mb-10">Monitoramento do Motor de Arbitragem e Configurações de API.</p>
 
       {/* Cards de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center">
-              <Activity className="w-5 h-5 text-brand-500" />
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-100">
+              <Activity className="w-6 h-6 text-emerald-600" />
             </div>
-            <span className="text-xs font-bold text-profit-400 bg-profit-400/10 px-2 py-1 rounded">Online</span>
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md uppercase tracking-wider">Online</span>
           </div>
-          <div className="text-gray-400 text-sm mb-1">Status do Scanner</div>
-          <div className="text-2xl font-bold text-white">Ativo</div>
+          <div className="text-slate-500 text-sm font-bold mb-1 uppercase tracking-wider">Status do Scanner</div>
+          <div className="text-2xl font-black text-slate-900">Ativo</div>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <Server className="w-5 h-5 text-purple-500" />
+            <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
+              <Server className="w-6 h-6 text-indigo-600" />
             </div>
           </div>
-          <div className="text-gray-400 text-sm mb-1">Uso da API (Real-time)</div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-slate-500 text-sm font-bold mb-1 uppercase tracking-wider">Uso da API (Real-time)</div>
+          <div className="text-2xl font-black text-slate-900">
             {status === 'success' ? `${usage.used} / ${totalRequests}` : '-- / --'}
           </div>
-          <div className="w-full bg-dark-900 rounded-full h-1.5 mt-3 overflow-hidden">
+          <div className="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden">
             <div 
-              className={`h-1.5 rounded-full transition-all duration-500 ${usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 75 ? 'bg-orange-500' : 'bg-purple-500'}`} 
+              className={`h-2 rounded-full transition-all duration-500 ${usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 75 ? 'bg-amber-500' : 'bg-indigo-500'}`} 
               style={{ width: `${status === 'success' ? usagePercentage : 0}%` }}
             ></div>
           </div>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-              <Database className="w-5 h-5 text-blue-500" />
+            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
+              <Database className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <div className="text-gray-400 text-sm mb-1">Eventos em Cache</div>
-          <div className="text-2xl font-bold text-white">1,248</div>
+          <div className="text-slate-500 text-sm font-bold mb-1 uppercase tracking-wider">Eventos em Cache</div>
+          <div className="text-2xl font-black text-slate-900">1,248</div>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
+            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-100">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
             </div>
           </div>
-          <div className="text-gray-400 text-sm mb-1">Oportunidades Ativas</div>
-          <div className="text-2xl font-bold text-white">12</div>
+          <div className="text-slate-500 text-sm font-bold mb-1 uppercase tracking-wider">Oportunidades Ativas</div>
+          <div className="text-2xl font-black text-slate-900">12</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Coluna da Esquerda */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-8">
           
           {/* Configuração da API */}
-          <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
-            <div className="p-6 border-b border-dark-700 flex items-center gap-3">
-              <Key className="w-5 h-5 text-brand-500" />
-              <h2 className="text-lg font-bold text-white">Configuração da API</h2>
+          <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+              <Key className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-bold text-slate-900">Configuração da API</h2>
             </div>
             <div className="p-6">
-              <form onSubmit={handleSave} className="space-y-4">
+              <form onSubmit={handleSave} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
                     odds-api.io Key
                   </label>
-                  <div className="relative">
+                  <div className="relative shadow-sm rounded-xl">
                     <input
                       type={showKey ? "text" : "password"}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder="Insira sua API Key..."
-                      className="w-full bg-dark-900 border border-dark-600 rounded-lg pl-4 pr-10 py-2.5 text-white text-sm focus:outline-none focus:border-brand-500 transition-colors"
+                      className="w-full bg-white border border-slate-300 rounded-xl pl-4 pr-10 py-3 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowKey(!showKey)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none rounded p-1"
                     >
-                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
 
                 {status === 'error' && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex gap-2 items-start text-red-400 text-xs">
-                    <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-start text-red-700 text-sm font-medium">
+                    <XCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
                     <p>{errorMessage}</p>
                   </div>
                 )}
 
                 {status === 'success' && (
-                  <div className="bg-profit-500/10 border border-profit-500/20 rounded-lg p-3 flex gap-2 items-start text-profit-400 text-xs">
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <p>Chave salva globalmente! O motor de backend já está utilizando esta chave.</p>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 items-start text-emerald-700 text-sm font-medium">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" />
+                    <p>Chave validada e salva globalmente. O motor já está utilizando-a.</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={status === 'validating' || !apiKey}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-brand-600 hover:bg-brand-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {status === 'validating' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <Save className="w-4 h-4" />
+                    <Save className="w-5 h-5" />
                   )}
                   {status === 'validating' ? 'Validando...' : 'Salvar no Servidor'}
                 </button>
@@ -288,21 +263,21 @@ export function Admin() {
           </div>
 
           {/* Ferramentas de Teste */}
-          <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
-            <div className="p-6 border-b border-dark-700 flex items-center gap-3">
-              <Beaker className="w-5 h-5 text-purple-500" />
-              <h2 className="text-lg font-bold text-white">Ferramentas de Teste</h2>
+          <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+              <Beaker className="w-5 h-5 text-purple-600" />
+              <h2 className="text-lg font-bold text-slate-900">Ferramentas de Teste</h2>
             </div>
             <div className="p-6">
-              <p className="text-sm text-gray-400 mb-4">
-                Injete uma oportunidade de arbitragem falsa no banco de dados para testar o Painel em tempo real e a Calculadora.
+              <p className="text-sm text-slate-600 mb-5 font-medium leading-relaxed">
+                Injete uma oportunidade de arbitragem simulada no banco de dados para testar o Painel em tempo real.
               </p>
               <button
                 onClick={handleInjectMock}
                 disabled={injecting}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-purple-500/30 rounded-lg shadow-sm text-sm font-medium text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 focus:outline-none transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all disabled:opacity-50"
               >
-                {injecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                {injecting ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : <PlusCircle className="w-5 h-5 text-slate-400" />}
                 {injecting ? 'Injetando no Banco...' : 'Gerar Surebet de Exemplo'}
               </button>
             </div>
@@ -312,20 +287,28 @@ export function Admin() {
 
         {/* Logs do Sistema */}
         <div className="lg:col-span-2">
-          <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden h-full flex flex-col min-h-[400px]">
-            <div className="p-6 border-b border-dark-700">
-              <h2 className="text-lg font-bold text-white">Logs do Scanner (Real-time)</h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden h-full flex flex-col min-h-[450px] shadow-lg">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+              <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Logs do Scanner (Real-time)
+              </h2>
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-slate-700"></div>
+                <div className="w-3 h-3 rounded-full bg-slate-700"></div>
+                <div className="w-3 h-3 rounded-full bg-slate-700"></div>
+              </div>
             </div>
-            <div className="p-6 font-mono text-sm text-gray-400 space-y-2 flex-1 overflow-y-auto bg-dark-900/50">
-              <div><span className="text-brand-400">[10:45:01]</span> [Scanner] Inicializando workers de background...</div>
-              <div><span className="text-brand-400">[10:45:02]</span> [OddsAPI] Validando limites: {status === 'success' ? `${usage.remaining} requisições restantes` : 'Aguardando chave...'}</div>
+            <div className="p-6 font-mono text-sm text-slate-400 space-y-3 flex-1 overflow-y-auto">
+              <div><span className="text-indigo-400">[10:45:01]</span> [Scanner] Inicializando workers de background...</div>
+              <div><span className="text-indigo-400">[10:45:02]</span> [OddsAPI] Validando limites: {status === 'success' ? `${usage.remaining} requisições restantes` : 'Aguardando chave...'}</div>
               {status === 'success' && (
                 <>
-                  <div><span className="text-brand-400">[10:45:03]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
-                  <div><span className="text-brand-400">[10:45:04]</span> [Engine] 48 eventos processados. 0 surebets encontradas.</div>
-                  <div><span className="text-brand-400">[10:45:39]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
-                  <div><span className="text-profit-400">[10:45:40]</span> [Engine] 🔥 SUREBET DETECTADA! ROI: 4.25% - Arsenal vs Liverpool</div>
-                  <div><span className="text-brand-400">[10:46:15]</span> [Scanner] Aguardando intervalo de rate limit (36s)...</div>
+                  <div><span className="text-indigo-400">[10:45:03]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
+                  <div><span className="text-indigo-400">[10:45:04]</span> [Engine] 48 eventos processados. 0 surebets encontradas.</div>
+                  <div><span className="text-indigo-400">[10:45:39]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
+                  <div className="text-emerald-400 font-bold bg-emerald-400/10 p-2 rounded"><span className="text-emerald-500">[10:45:40]</span> [Engine] 🔥 SUREBET DETECTADA! ROI: 4.25% - Arsenal vs Liverpool</div>
+                  <div><span className="text-indigo-400">[10:46:15]</span> [Scanner] Aguardando intervalo de rate limit (36s)...</div>
                 </>
               )}
             </div>
