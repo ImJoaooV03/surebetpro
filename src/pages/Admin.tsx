@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, Database, AlertTriangle, Key, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Save, Beaker, PlusCircle } from 'lucide-react';
+import { Activity, Server, Database, AlertTriangle, Key, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Save, Beaker, PlusCircle, Link as LinkIcon } from 'lucide-react';
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
 export function Admin() {
   const [apiKey, setApiKey] = useState('');
+  const [apiBaseUrl, setApiBaseUrl] = useState('https://api.odds-api.io/v1');
+  const [apiEndpoint, setApiEndpoint] = useState('/odds');
   const [showKey, setShowKey] = useState(false);
   const [status, setStatus] = useState<'idle' | 'validating' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -13,44 +15,54 @@ export function Admin() {
   const [injecting, setInjecting] = useState(false);
 
   useEffect(() => {
-    fetchGlobalApiKey();
+    fetchGlobalSettings();
   }, []);
 
-  const fetchGlobalApiKey = async () => {
+  const fetchGlobalSettings = async () => {
     try {
       const { data, error } = await supabase
         .from('system_settings')
-        .select('odds_api_key')
+        .select('odds_api_key, api_base_url, api_endpoint_odds')
         .eq('id', 1)
         .single();
 
-      if (!error && data?.odds_api_key) {
-        setApiKey(data.odds_api_key);
-        await validateApiKey(data.odds_api_key, false);
+      if (!error && data) {
+        if (data.odds_api_key) setApiKey(data.odds_api_key);
+        if (data.api_base_url) setApiBaseUrl(data.api_base_url);
+        if (data.api_endpoint_odds) setApiEndpoint(data.api_endpoint_odds);
+        
+        if (data.odds_api_key) {
+          await validateApiKey(data.odds_api_key, data.api_base_url || 'https://api.odds-api.io/v1', data.api_endpoint_odds || '/odds', false);
+        }
       }
     } catch (error) {
-      console.error("Erro ao buscar chave da API:", error);
+      console.error("Erro ao buscar configurações da API:", error);
     } finally {
       setLoadingInitial(false);
     }
   };
 
-  const validateApiKey = async (keyToTest: string, shouldSaveToDb: boolean = true) => {
+  const validateApiKey = async (keyToTest: string, baseUrl: string, endpoint: string, shouldSaveToDb: boolean = true) => {
     const cleanKey = keyToTest.trim(); 
+    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, ''); // Remove barra no final
+    const cleanEndpoint = endpoint.trim().startsWith('/') ? endpoint.trim() : `/${endpoint.trim()}`; // Garante barra no início
+
     if (!cleanKey) return;
 
     if (cleanKey.length < 20) {
       setStatus('error');
       setUsage({ used: 0, remaining: 0 });
-      setErrorMessage('A chave informada parece muito curta. Verifique se copiou corretamente do painel da odds-api.io.');
+      setErrorMessage('A chave informada parece muito curta. Verifique se copiou corretamente.');
       return;
     }
     
     setStatus('validating');
     setErrorMessage('');
 
+    const fullUrl = `${cleanBaseUrl}${cleanEndpoint}`;
+
     try {
-      const response = await axios.get('https://api.odds-api.io/v1/odds', {
+      const response = await axios.get(fullUrl, {
         headers: {
           'Authorization': `Bearer ${cleanKey}`,
           'Accept': 'application/json'
@@ -63,36 +75,53 @@ export function Admin() {
         throw new Error('Unauthorized');
       }
 
+      if (response.status === 404) {
+        throw new Error(`Endpoint não encontrado (404) em: ${fullUrl}`);
+      }
+
       const used = parseInt(response.headers['x-ratelimit-used'] || response.headers['x-requests-used'] || '0', 10);
       const remaining = parseInt(response.headers['x-ratelimit-remaining'] || response.headers['x-requests-remaining'] || '100', 10);
 
       setUsage({ used, remaining });
       setStatus('success');
       setApiKey(cleanKey);
+      setApiBaseUrl(cleanBaseUrl);
+      setApiEndpoint(cleanEndpoint);
 
       if (shouldSaveToDb) {
-        await supabase.from('system_settings').update({ odds_api_key: cleanKey }).eq('id', 1);
+        await supabase.from('system_settings').update({ 
+          odds_api_key: cleanKey,
+          api_base_url: cleanBaseUrl,
+          api_endpoint_odds: cleanEndpoint
+        }).eq('id', 1);
       }
 
     } catch (error: any) {
+      setStatus('error');
+      setUsage({ used: 0, remaining: 0 });
+      
       if (error.message === 'Unauthorized') {
-        setStatus('error');
-        setUsage({ used: 0, remaining: 0 });
-        setErrorMessage('Chave de API inválida ou não autorizada pela odds-api.io.');
+        setErrorMessage('Chave de API inválida ou não autorizada.');
+      } else if (error.response?.status === 404 || error.message.includes('404')) {
+        setErrorMessage(`Erro 404: A URL ${fullUrl} não existe nesta API. Verifique a URL Base e o Endpoint.`);
       } else {
-        setStatus('success');
-        setApiKey(cleanKey);
-        setErrorMessage('');
-        if (shouldSaveToDb) {
-          await supabase.from('system_settings').update({ odds_api_key: cleanKey }).eq('id', 1);
-        }
+        setErrorMessage(`Falha na conexão: ${error.message}`);
+      }
+
+      // Salva mesmo com erro para permitir que o usuário teste no scanner manual
+      if (shouldSaveToDb) {
+        await supabase.from('system_settings').update({ 
+          odds_api_key: cleanKey,
+          api_base_url: cleanBaseUrl,
+          api_endpoint_odds: cleanEndpoint
+        }).eq('id', 1);
       }
     }
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    validateApiKey(apiKey, true);
+    validateApiKey(apiKey, apiBaseUrl, apiEndpoint, true);
   };
 
   const handleInjectMock = async () => {
@@ -209,9 +238,42 @@ export function Admin() {
             </div>
             <div className="p-6">
               <form onSubmit={handleSave} className="space-y-5">
+                
+                {/* Advanced URL Config */}
+                <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <LinkIcon className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Rotas da API</span>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">URL Base</label>
+                    <input
+                      type="text"
+                      value={apiBaseUrl}
+                      onChange={(e) => setApiBaseUrl(e.target.value)}
+                      placeholder="https://api.odds-api.io/v1"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Endpoint de Odds</label>
+                    <input
+                      type="text"
+                      value={apiEndpoint}
+                      onChange={(e) => setApiEndpoint(e.target.value)}
+                      placeholder="/odds"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    odds-api.io Key
+                    API Key
                   </label>
                   <div className="relative shadow-sm rounded-xl">
                     <input
@@ -235,14 +297,14 @@ export function Admin() {
                 {status === 'error' && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-start text-red-700 text-sm font-medium">
                     <XCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
-                    <p>{errorMessage}</p>
+                    <p className="break-words">{errorMessage}</p>
                   </div>
                 )}
 
                 {status === 'success' && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 items-start text-emerald-700 text-sm font-medium">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" />
-                    <p>Chave validada e salva globalmente. O motor já está utilizando-a.</p>
+                    <p>Chave e rotas validadas com sucesso!</p>
                   </div>
                 )}
 
@@ -256,7 +318,7 @@ export function Admin() {
                   ) : (
                     <Save className="w-5 h-5" />
                   )}
-                  {status === 'validating' ? 'Validando...' : 'Salvar no Servidor'}
+                  {status === 'validating' ? 'Validando...' : 'Salvar Configurações'}
                 </button>
               </form>
             </div>
@@ -300,15 +362,13 @@ export function Admin() {
               </div>
             </div>
             <div className="p-6 font-mono text-sm text-slate-400 space-y-3 flex-1 overflow-y-auto">
+              <div><span className="text-indigo-400">[Sistema]</span> URL configurada: {apiBaseUrl}{apiEndpoint}</div>
               <div><span className="text-indigo-400">[10:45:01]</span> [Scanner] Inicializando workers de background...</div>
               <div><span className="text-indigo-400">[10:45:02]</span> [OddsAPI] Validando limites: {status === 'success' ? `${usage.remaining} requisições restantes` : 'Aguardando chave...'}</div>
               {status === 'success' && (
                 <>
-                  <div><span className="text-indigo-400">[10:45:03]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
+                  <div><span className="text-indigo-400">[10:45:03]</span> [Scanner] Requisição enviada: {apiEndpoint}?bookmakers=superbet,novibet</div>
                   <div><span className="text-indigo-400">[10:45:04]</span> [Engine] 48 eventos processados. 0 surebets encontradas.</div>
-                  <div><span className="text-indigo-400">[10:45:39]</span> [Scanner] Requisição enviada: /v1/odds?bookmakers=superbet,novibet</div>
-                  <div className="text-emerald-400 font-bold bg-emerald-400/10 p-2 rounded"><span className="text-emerald-500">[10:45:40]</span> [Engine] 🔥 SUREBET DETECTADA! ROI: 4.25% - Arsenal vs Liverpool</div>
-                  <div><span className="text-indigo-400">[10:46:15]</span> [Scanner] Aguardando intervalo de rate limit (36s)...</div>
                 </>
               )}
             </div>

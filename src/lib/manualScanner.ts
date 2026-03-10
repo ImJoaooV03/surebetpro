@@ -1,13 +1,6 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { supabase } from './supabase';
 import { ArbitrageEngine, SurebetOpportunity } from './arbitrage';
-
-interface ApiSport {
-  key: string;
-  group: string;
-  title: string;
-  active: boolean;
-}
 
 export async function runManualScan(onProgress: (msg: string) => void): Promise<number> {
   try {
@@ -17,6 +10,10 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
     if (settingsError || !settings?.odds_api_key) {
       throw new Error('API Key não configurada. Vá em Admin e adicione sua chave.');
     }
+
+    const baseUrl = settings.api_base_url ? settings.api_base_url.replace(/\/$/, '') : 'https://api.odds-api.io/v1';
+    const endpoint = settings.api_endpoint_odds ? (settings.api_endpoint_odds.startsWith('/') ? settings.api_endpoint_odds : `/${settings.api_endpoint_odds}`) : '/odds';
+    const fullUrl = `${baseUrl}${endpoint}`;
 
     const { data: sports } = await supabase.from('sports').select('key').eq('active', true);
     const { data: markets } = await supabase.from('markets').select('key').eq('active', true);
@@ -29,29 +26,7 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
     if (activeBookmakers.length < 2) throw new Error('Ative pelo menos 2 casas de apostas nas Configurações.');
     if (activeSportGroups.length === 0) throw new Error('Ative pelo menos 1 esporte nas Configurações.');
 
-    let leaguesToScan: { key: string; title: string }[] = [];
-    let useGlobalFallback = false;
-
-    // Tenta buscar a lista de ligas
-    try {
-      onProgress('Consultando ligas ativas...');
-      const sportsRes = await axios.get<ApiSport[]>('https://api.odds-api.io/v1/sports', {
-        headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
-        timeout: 10000
-      });
-
-      if (Array.isArray(sportsRes.data)) {
-        leaguesToScan = sportsRes.data.filter(apiSport => 
-          apiSport.group && activeSportGroups.includes(apiSport.group.toLowerCase())
-        );
-      }
-    } catch (err) {
-      console.warn(`[Scanner] Endpoint /sports indisponível. Ativando Varredura Global.`);
-      useGlobalFallback = true;
-    }
-
     let totalFound = 0;
-    let successfulRequests = 0;
     let lastErrorMsg = '';
 
     const processEvents = async (events: any[]) => {
@@ -70,58 +45,33 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
       }
     };
 
-    // Se não conseguiu listar as ligas, faz uma requisição global (traz tudo)
-    if (useGlobalFallback || leaguesToScan.length === 0) {
-      onProgress('Realizando varredura global nas casas de apostas...');
-      try {
-        const oddsRes = await axios.get('https://api.odds-api.io/v1/odds', {
-          headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
-          params: {
-            bookmakers: activeBookmakers.join(','),
-            markets: activeMarkets.join(',')
-          },
-          timeout: 20000
-        });
-        
-        successfulRequests++;
-        if (Array.isArray(oddsRes.data)) {
-          await processEvents(oddsRes.data);
-        }
-      } catch (err: any) {
-        const status = err.response?.status;
-        const data = err.response?.data;
-        lastErrorMsg = status ? `HTTP ${status}: ${JSON.stringify(data)}` : err.message;
+    onProgress('Realizando varredura global nas casas de apostas...');
+    try {
+      const oddsRes = await axios.get(fullUrl, {
+        headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
+        params: {
+          bookmakers: activeBookmakers.join(','),
+          markets: activeMarkets.join(',')
+        },
+        timeout: 20000
+      });
+      
+      if (Array.isArray(oddsRes.data)) {
+        await processEvents(oddsRes.data);
+      } else {
+        throw new Error(`A API retornou um formato inesperado. Verifique o endpoint.`);
       }
-    } else {
-      // Se conseguiu listar as ligas, busca uma por uma
-      for (const league of leaguesToScan) {
-        onProgress(`Analisando: ${league.title}...`);
-        try {
-          const oddsRes = await axios.get('https://api.odds-api.io/v1/odds', {
-            headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
-            params: {
-              sport: league.key,
-              bookmakers: activeBookmakers.join(','),
-              markets: activeMarkets.join(',')
-            },
-            timeout: 15000
-          });
-          
-          successfulRequests++;
-          if (Array.isArray(oddsRes.data)) {
-            await processEvents(oddsRes.data);
-          }
-        } catch (err: any) {
-          const status = err.response?.status;
-          const data = err.response?.data;
-          lastErrorMsg = status ? `HTTP ${status}: ${JSON.stringify(data)}` : err.message;
-        }
-        await new Promise(resolve => setTimeout(resolve, 500)); // Delay para não tomar block da API
+    } catch (err: any) {
+      const status = err.response?.status;
+      const data = err.response?.data;
+      const urlCalled = err.config?.url;
+      
+      if (status === 404) {
+        throw new Error(`HTTP 404: A rota ${urlCalled} não existe. Vá em Admin e corrija a URL Base ou o Endpoint.`);
       }
-    }
-
-    if (successfulRequests === 0) {
-      throw new Error(`A API rejeitou a requisição. Detalhes do servidor: ${lastErrorMsg}`);
+      
+      lastErrorMsg = status ? `HTTP ${status} em ${urlCalled}: ${JSON.stringify(data)}` : err.message;
+      throw new Error(`A API rejeitou a requisição. Detalhes: ${lastErrorMsg}`);
     }
 
     onProgress(`Scan Finalizado!`);
