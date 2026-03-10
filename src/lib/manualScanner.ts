@@ -30,8 +30,9 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
     if (activeSportGroups.length === 0) throw new Error('Ative pelo menos 1 esporte nas Configurações.');
 
     let leaguesToScan: { key: string; title: string }[] = [];
+    let useGlobalFallback = false;
 
-    // Bloco Try-Catch robusto para a busca de ligas
+    // Tenta buscar a lista de ligas
     try {
       onProgress('Consultando ligas ativas...');
       const sportsRes = await axios.get<ApiSport[]>('https://api.odds-api.io/v1/sports', {
@@ -45,64 +46,82 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
         );
       }
     } catch (err) {
-      const axiosError = err as AxiosError;
-      console.warn(`[Scanner] Falha ao buscar ligas (${axiosError.message}). Tentando busca direta...`);
-      // Fallback: Se o endpoint /sports der 404, tenta buscar usando a chave do grupo diretamente
-      leaguesToScan = activeSportGroups.map(group => ({ key: group, title: group.toUpperCase() }));
-    }
-
-    if (leaguesToScan.length === 0) {
-       throw new Error('Nenhuma liga correspondente encontrada para os esportes ativos.');
+      console.warn(`[Scanner] Endpoint /sports indisponível. Ativando Varredura Global.`);
+      useGlobalFallback = true;
     }
 
     let totalFound = 0;
     let successfulRequests = 0;
+    let lastErrorMsg = '';
 
-    for (const league of leaguesToScan) {
-      onProgress(`Analisando: ${league.title}...`);
-      
-      // Bloco Try-Catch individual por liga para não quebrar o loop inteiro
+    const processEvents = async (events: any[]) => {
+      for (const event of events) {
+        if (!event.commence_time) continue;
+        const commenceTime = new Date(event.commence_time).getTime();
+        if (commenceTime <= Date.now()) continue; // Ignora jogos ao vivo
+
+        const opportunities = ArbitrageEngine.analyzeEvent(event);
+        for (const opp of opportunities) {
+          if (opp.roi >= settings.min_roi) {
+            await saveOpportunityToDb(opp);
+            totalFound++;
+          }
+        }
+      }
+    };
+
+    // Se não conseguiu listar as ligas, faz uma requisição global (traz tudo)
+    if (useGlobalFallback || leaguesToScan.length === 0) {
+      onProgress('Realizando varredura global nas casas de apostas...');
       try {
         const oddsRes = await axios.get('https://api.odds-api.io/v1/odds', {
           headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
           params: {
-            sport: league.key,
             bookmakers: activeBookmakers.join(','),
             markets: activeMarkets.join(',')
           },
-          timeout: 15000
+          timeout: 20000
         });
-
+        
         successfulRequests++;
-
         if (Array.isArray(oddsRes.data)) {
-          for (const event of oddsRes.data) {
-            if (!event.commence_time) continue;
-            const commenceTime = new Date(event.commence_time).getTime();
-            if (commenceTime <= Date.now()) continue; // Ignora jogos ao vivo
-
-            const opportunities = ArbitrageEngine.analyzeEvent(event);
-            
-            for (const opp of opportunities) {
-              if (opp.roi >= settings.min_roi) {
-                await saveOpportunityToDb(opp);
-                totalFound++;
-              }
-            }
-          }
+          await processEvents(oddsRes.data);
         }
-      } catch (err) {
-         const axiosError = err as AxiosError;
-         console.warn(`Erro ao escanear liga ${league.title}:`, axiosError.message);
-         // Não lança o erro aqui para permitir que o loop continue para a próxima liga
+      } catch (err: any) {
+        const status = err.response?.status;
+        const data = err.response?.data;
+        lastErrorMsg = status ? `HTTP ${status}: ${JSON.stringify(data)}` : err.message;
       }
-      
-      // Pequeno delay para não sobrecarregar a API
-      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      // Se conseguiu listar as ligas, busca uma por uma
+      for (const league of leaguesToScan) {
+        onProgress(`Analisando: ${league.title}...`);
+        try {
+          const oddsRes = await axios.get('https://api.odds-api.io/v1/odds', {
+            headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
+            params: {
+              sport: league.key,
+              bookmakers: activeBookmakers.join(','),
+              markets: activeMarkets.join(',')
+            },
+            timeout: 15000
+          });
+          
+          successfulRequests++;
+          if (Array.isArray(oddsRes.data)) {
+            await processEvents(oddsRes.data);
+          }
+        } catch (err: any) {
+          const status = err.response?.status;
+          const data = err.response?.data;
+          lastErrorMsg = status ? `HTTP ${status}: ${JSON.stringify(data)}` : err.message;
+        }
+        await new Promise(resolve => setTimeout(resolve, 500)); // Delay para não tomar block da API
+      }
     }
 
     if (successfulRequests === 0) {
-      throw new Error('Falha de comunicação com a API. Verifique sua chave ou os endpoints.');
+      throw new Error(`A API rejeitou a requisição. Detalhes do servidor: ${lastErrorMsg}`);
     }
 
     onProgress(`Scan Finalizado!`);
@@ -110,7 +129,6 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
 
   } catch (error: any) {
     console.error('Erro no Scanner Manual:', error);
-    // Repassa uma mensagem limpa para a interface
     throw new Error(error.message || 'Erro desconhecido ao escanear a API.');
   }
 }

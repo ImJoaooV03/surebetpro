@@ -110,18 +110,14 @@ export function Dashboard() {
       } else {
         setScanStatus('Nenhuma oportunidade com o ROI mínimo encontrada.');
       }
-      // Limpa o status de sucesso após 4 segundos
       setTimeout(() => {
         setIsScanning(false);
         setScanStatus('');
       }, 4000);
     } catch (error: any) {
-      // Em caso de erro, para o loading imediatamente e mostra o erro
       setIsScanning(false);
       setScanStatus('');
       setScanError(error.message);
-      // Limpa o erro após 6 segundos
-      setTimeout(() => setScanError(''), 6000);
     }
   };
 
@@ -145,30 +141,29 @@ export function Dashboard() {
       <div className="w-full max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-          <div>
+          <div className="flex-1 w-full">
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1 flex items-center gap-3 flex-wrap">
               Live Scanner
               
-              {/* Badge de Sucesso/Loading (Verde) */}
               {isScanning && scanStatus && (
                 <span className="text-xs font-bold bg-[#39FF14]/10 text-[#39FF14] px-3 py-1 rounded-full border border-[#39FF14]/20 animate-pulse flex items-center gap-2">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   {scanStatus}
                 </span>
               )}
-
-              {/* Badge de Erro (Vermelho) */}
-              {scanError && (
-                <span className="text-xs font-bold bg-red-500/10 text-red-500 px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                  <AlertCircle className="w-3 h-3" />
-                  Erro: {scanError}
-                </span>
-              )}
             </h1>
-            <p className="text-[#8b8d93] text-sm font-medium">Monitoramento em tempo real de arbitragem.</p>
+            <p className="text-[#8b8d93] text-sm font-medium mb-3">Monitoramento em tempo real de arbitragem.</p>
+            
+            {/* Badge de Erro Melhorada - Permite quebra de linha para ler o erro completo da API */}
+            {scanError && (
+              <div className="text-xs font-bold bg-red-500/10 text-red-500 px-4 py-3 rounded-xl border border-red-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-left-2 w-full max-w-3xl">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <span className="break-words whitespace-pre-wrap leading-relaxed">{scanError}</span>
+              </div>
+            )}
           </div>
           
-          <div className="flex w-full md:w-auto gap-3 flex-col sm:flex-row">
+          <div className="flex w-full md:w-auto gap-3 flex-col sm:flex-row items-start">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8d93]" />
               <input 
@@ -195,7 +190,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Status Message (if scanning finished with message but no error) */}
+        {/* Status Message */}
         {!isScanning && scanStatus && !scanError && (
           <div className="mb-6 bg-[#161618] border border-[#2c2e33] rounded-xl p-4 text-sm text-gray-300 flex items-center gap-3 animate-in fade-in">
             <AlertCircle className="w-5 h-5 text-[#39FF14]" />
@@ -254,7 +249,6 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Modal da Calculadora */}
       <CalculatorModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
