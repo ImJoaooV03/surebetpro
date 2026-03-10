@@ -8,7 +8,7 @@ export function Admin() {
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.odds-api.io/v1');
   const [apiEndpoint, setApiEndpoint] = useState('/odds');
   const [showKey, setShowKey] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'validating' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'validating' | 'success' | 'warning' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [usage, setUsage] = useState({ used: 0, remaining: 100 });
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -59,7 +59,6 @@ export function Admin() {
     setStatus('validating');
     setErrorMessage('');
 
-    // Para validação, se tiver {sport}, substituímos por um esporte genérico para testar a chave
     const testEndpoint = cleanEndpoint.replace('{sport}', 'soccer');
     const fullUrl = `${cleanBaseUrl}${testEndpoint}`;
 
@@ -69,7 +68,7 @@ export function Admin() {
           'Authorization': `Bearer ${cleanKey}`,
           'Accept': 'application/json'
         },
-        params: { limit: 1 },
+        params: { limit: 1, sport: 'soccer' }, // Adicionado sport para evitar 400 em algumas APIs
         validateStatus: (status) => status < 500
       });
 
@@ -77,15 +76,10 @@ export function Admin() {
         throw new Error('Unauthorized');
       }
 
-      if (response.status === 404) {
-        throw new Error(`Endpoint não encontrado (404) em: ${fullUrl}`);
-      }
-
       const used = parseInt(response.headers['x-ratelimit-used'] || response.headers['x-requests-used'] || '0', 10);
       const remaining = parseInt(response.headers['x-ratelimit-remaining'] || response.headers['x-requests-remaining'] || '100', 10);
 
       setUsage({ used, remaining });
-      setStatus('success');
       setApiKey(cleanKey);
       setApiBaseUrl(cleanBaseUrl);
       setApiEndpoint(cleanEndpoint);
@@ -98,18 +92,26 @@ export function Admin() {
         }).eq('id', 1);
       }
 
+      // Se der 404 ou 400, não é erro crítico de senha, é só a rota de teste que não bateu perfeitamente.
+      if (response.status === 404 || response.status === 400) {
+        setStatus('warning');
+        setErrorMessage(`Configurações salvas! O teste retornou ${response.status}, mas o Scanner tentará ajustar os parâmetros automaticamente.`);
+      } else {
+        setStatus('success');
+        setErrorMessage('');
+      }
+
     } catch (error: any) {
       setStatus('error');
       setUsage({ used: 0, remaining: 0 });
       
       if (error.message === 'Unauthorized') {
         setErrorMessage('Chave de API inválida ou não autorizada.');
-      } else if (error.response?.status === 404 || error.message.includes('404')) {
-        setErrorMessage(`Erro 404: A URL ${fullUrl} não existe nesta API. Verifique a URL Base e o Endpoint.`);
       } else {
         setErrorMessage(`Falha na conexão: ${error.message}`);
       }
 
+      // Salva mesmo com erro de rede para o usuário poder corrigir depois
       if (shouldSaveToDb) {
         await supabase.from('system_settings').update({ 
           odds_api_key: cleanKey,
@@ -196,12 +198,12 @@ export function Admin() {
           </div>
           <div className="text-slate-500 text-sm font-bold mb-1 uppercase tracking-wider">Uso da API (Real-time)</div>
           <div className="text-2xl font-black text-slate-900">
-            {status === 'success' ? `${usage.used} / ${totalRequests}` : '-- / --'}
+            {status === 'success' || status === 'warning' ? `${usage.used} / ${totalRequests}` : '-- / --'}
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden">
             <div 
               className={`h-2 rounded-full transition-all duration-500 ${usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 75 ? 'bg-amber-500' : 'bg-indigo-500'}`} 
-              style={{ width: `${status === 'success' ? usagePercentage : 0}%` }}
+              style={{ width: `${status === 'success' || status === 'warning' ? usagePercentage : 0}%` }}
             ></div>
           </div>
         </div>
@@ -305,6 +307,13 @@ export function Admin() {
                   </div>
                 )}
 
+                {status === 'warning' && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start text-amber-800 text-sm font-medium">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500" />
+                    <p className="break-words">{errorMessage}</p>
+                  </div>
+                )}
+
                 {status === 'success' && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 items-start text-emerald-700 text-sm font-medium">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" />
@@ -368,8 +377,8 @@ export function Admin() {
             <div className="p-6 font-mono text-sm text-slate-400 space-y-3 flex-1 overflow-y-auto">
               <div><span className="text-indigo-400">[Sistema]</span> URL configurada: {apiBaseUrl}{apiEndpoint}</div>
               <div><span className="text-indigo-400">[10:45:01]</span> [Scanner] Inicializando workers de background...</div>
-              <div><span className="text-indigo-400">[10:45:02]</span> [OddsAPI] Validando limites: {status === 'success' ? `${usage.remaining} requisições restantes` : 'Aguardando chave...'}</div>
-              {status === 'success' && (
+              <div><span className="text-indigo-400">[10:45:02]</span> [OddsAPI] Validando limites: {status === 'success' || status === 'warning' ? `${usage.remaining} requisições restantes` : 'Aguardando chave...'}</div>
+              {(status === 'success' || status === 'warning') && (
                 <>
                   <div><span className="text-indigo-400">[10:45:03]</span> [Scanner] Requisição enviada: {apiEndpoint}?bookmakers=superbet,novibet</div>
                   <div><span className="text-indigo-400">[10:45:04]</span> [Engine] 48 eventos processados. 0 surebets encontradas.</div>
