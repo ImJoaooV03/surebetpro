@@ -43,6 +43,7 @@ export function Dashboard() {
   // Scanner State
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
+  const [scanError, setScanError] = useState('');
 
   useEffect(() => {
     fetchOpportunities();
@@ -100,6 +101,7 @@ export function Dashboard() {
     if (isScanning) return;
     setIsScanning(true);
     setScanStatus('Iniciando motor...');
+    setScanError('');
     
     try {
       const found = await runManualScan((status) => setScanStatus(status));
@@ -108,13 +110,18 @@ export function Dashboard() {
       } else {
         setScanStatus('Nenhuma oportunidade com o ROI mínimo encontrada.');
       }
-    } catch (error: any) {
-      setScanStatus(`Erro: ${error.message}`);
-    } finally {
+      // Limpa o status de sucesso após 4 segundos
       setTimeout(() => {
         setIsScanning(false);
         setScanStatus('');
       }, 4000);
+    } catch (error: any) {
+      // Em caso de erro, para o loading imediatamente e mostra o erro
+      setIsScanning(false);
+      setScanStatus('');
+      setScanError(error.message);
+      // Limpa o erro após 6 segundos
+      setTimeout(() => setScanError(''), 6000);
     }
   };
 
@@ -139,12 +146,22 @@ export function Dashboard() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1 flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1 flex items-center gap-3 flex-wrap">
               Live Scanner
-              {isScanning && (
+              
+              {/* Badge de Sucesso/Loading (Verde) */}
+              {isScanning && scanStatus && (
                 <span className="text-xs font-bold bg-[#39FF14]/10 text-[#39FF14] px-3 py-1 rounded-full border border-[#39FF14]/20 animate-pulse flex items-center gap-2">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   {scanStatus}
+                </span>
+              )}
+
+              {/* Badge de Erro (Vermelho) */}
+              {scanError && (
+                <span className="text-xs font-bold bg-red-500/10 text-red-500 px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                  <AlertCircle className="w-3 h-3" />
+                  Erro: {scanError}
                 </span>
               )}
             </h1>
@@ -178,8 +195,8 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Status Message (if scanning finished with message) */}
-        {!isScanning && scanStatus && (
+        {/* Status Message (if scanning finished with message but no error) */}
+        {!isScanning && scanStatus && !scanError && (
           <div className="mb-6 bg-[#161618] border border-[#2c2e33] rounded-xl p-4 text-sm text-gray-300 flex items-center gap-3 animate-in fade-in">
             <AlertCircle className="w-5 h-5 text-[#39FF14]" />
             {scanStatus}
