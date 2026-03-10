@@ -44,8 +44,8 @@ export function Admin() {
 
   const validateApiKey = async (keyToTest: string, baseUrl: string, endpoint: string, shouldSaveToDb: boolean = true) => {
     const cleanKey = keyToTest.trim(); 
-    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, ''); // Remove barra no final
-    const cleanEndpoint = endpoint.trim().startsWith('/') ? endpoint.trim() : `/${endpoint.trim()}`; // Garante barra no início
+    const cleanBaseUrl = baseUrl.trim().replace(/\/$/, ''); 
+    const cleanEndpoint = endpoint.trim().startsWith('/') ? endpoint.trim() : `/${endpoint.trim()}`; 
 
     if (!cleanKey) return;
 
@@ -59,7 +59,9 @@ export function Admin() {
     setStatus('validating');
     setErrorMessage('');
 
-    const fullUrl = `${cleanBaseUrl}${cleanEndpoint}`;
+    // Para validação, se tiver {sport}, substituímos por um esporte genérico para testar a chave
+    const testEndpoint = cleanEndpoint.replace('{sport}', 'soccer');
+    const fullUrl = `${cleanBaseUrl}${testEndpoint}`;
 
     try {
       const response = await axios.get(fullUrl, {
@@ -108,7 +110,6 @@ export function Admin() {
         setErrorMessage(`Falha na conexão: ${error.message}`);
       }
 
-      // Salva mesmo com erro para permitir que o usuário teste no scanner manual
       if (shouldSaveToDb) {
         await supabase.from('system_settings').update({ 
           odds_api_key: cleanKey,
@@ -264,10 +265,13 @@ export function Admin() {
                       type="text"
                       value={apiEndpoint}
                       onChange={(e) => setApiEndpoint(e.target.value)}
-                      placeholder="/odds"
+                      placeholder="/odds ou /sports/{sport}/odds"
                       className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                       required
                     />
+                    <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
+                      <strong>Dica:</strong> Se a sua API exigir o nome do esporte na URL (ex: The Odds API v4), digite <code className="bg-slate-200 text-indigo-700 px-1.5 py-0.5 rounded font-bold">{"{sport}"}</code> no campo acima. <br/>Exemplo: <code className="bg-slate-200 text-indigo-700 px-1.5 py-0.5 rounded font-bold">/sports/{"{sport}"}/odds</code>
+                    </p>
                   </div>
                 </div>
 

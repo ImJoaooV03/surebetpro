@@ -13,7 +13,6 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
 
     const baseUrl = settings.api_base_url ? settings.api_base_url.replace(/\/$/, '') : 'https://api.odds-api.io/v1';
     const endpoint = settings.api_endpoint_odds ? (settings.api_endpoint_odds.startsWith('/') ? settings.api_endpoint_odds : `/${settings.api_endpoint_odds}`) : '/odds';
-    const fullUrl = `${baseUrl}${endpoint}`;
 
     const { data: sports } = await supabase.from('sports').select('key').eq('active', true);
     const { data: markets } = await supabase.from('markets').select('key').eq('active', true);
@@ -29,7 +28,7 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
     let totalFound = 0;
     let lastErrorMsg = '';
 
-    const processEvents = async (events: any[]) => {
+    const processEvents = async (events: any[], minRoi: number) => {
       for (const event of events) {
         if (!event.commence_time) continue;
         const commenceTime = new Date(event.commence_time).getTime();
@@ -37,7 +36,7 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
 
         const opportunities = ArbitrageEngine.analyzeEvent(event);
         for (const opp of opportunities) {
-          if (opp.roi >= settings.min_roi) {
+          if (opp.roi >= minRoi) {
             await saveOpportunityToDb(opp);
             totalFound++;
           }
@@ -45,33 +44,63 @@ export async function runManualScan(onProgress: (msg: string) => void): Promise<
       }
     };
 
-    onProgress('Realizando varredura global nas casas de apostas...');
+    let leaguesToScan: string[] = [];
+    
+    onProgress('Mapeando ligas disponíveis...');
     try {
-      const oddsRes = await axios.get(fullUrl, {
+      const sportsRes = await axios.get(`${baseUrl}/sports`, {
         headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
-        params: {
-          bookmakers: activeBookmakers.join(','),
-          markets: activeMarkets.join(',')
-        },
-        timeout: 20000
+        timeout: 10000
       });
-      
-      if (Array.isArray(oddsRes.data)) {
-        await processEvents(oddsRes.data);
-      } else {
-        throw new Error(`A API retornou um formato inesperado. Verifique o endpoint.`);
+      if (Array.isArray(sportsRes.data)) {
+        leaguesToScan = sportsRes.data
+          .filter((s: any) => activeSportGroups.includes(s.group?.toLowerCase() || s.key?.toLowerCase()))
+          .map((s: any) => s.key);
       }
     } catch (err: any) {
-      const status = err.response?.status;
-      const data = err.response?.data;
-      const urlCalled = err.config?.url;
-      
-      if (status === 404) {
-        throw new Error(`HTTP 404: A rota ${urlCalled} não existe. Vá em Admin e corrija a URL Base ou o Endpoint.`);
+      console.warn('Endpoint /sports falhou, usando fallback de categorias genéricas.');
+    }
+
+    // Se a API não tiver a rota /sports, usamos os nomes genéricos (soccer, basketball) direto
+    if (leaguesToScan.length === 0) {
+      leaguesToScan = activeSportGroups; 
+    }
+
+    for (const leagueKey of leaguesToScan) {
+      onProgress(`Analisando: ${leagueKey}...`);
+      try {
+        let requestUrl = `${baseUrl}${endpoint}`;
+        const params: any = {
+          bookmakers: activeBookmakers.join(','),
+          markets: activeMarkets.join(',')
+        };
+
+        // MÁGICA: Se a URL tiver {sport}, substitui pela liga. Se não, manda como parâmetro.
+        if (requestUrl.includes('{sport}')) {
+          requestUrl = requestUrl.replace('{sport}', leagueKey);
+        } else {
+          params.sport = leagueKey;
+        }
+
+        const oddsRes = await axios.get(requestUrl, {
+          headers: { 'Authorization': `Bearer ${settings.odds_api_key}`, 'Accept': 'application/json' },
+          params,
+          timeout: 15000
+        });
+        
+        const events = Array.isArray(oddsRes.data) ? oddsRes.data : (oddsRes.data?.data || []);
+        await processEvents(events, settings.min_roi);
+        
+      } catch (err: any) {
+        const status = err.response?.status;
+        const urlCalled = err.config?.url;
+        lastErrorMsg = status === 404 ? `HTTP 404 em ${urlCalled}` : err.message;
+        console.error(`Erro na liga ${leagueKey}:`, lastErrorMsg);
       }
-      
-      lastErrorMsg = status ? `HTTP ${status} em ${urlCalled}: ${JSON.stringify(data)}` : err.message;
-      throw new Error(`A API rejeitou a requisição. Detalhes: ${lastErrorMsg}`);
+    }
+
+    if (totalFound === 0 && lastErrorMsg) {
+      throw new Error(`Nenhuma oportunidade encontrada. Último erro da API: ${lastErrorMsg}. Verifique suas rotas no Admin.`);
     }
 
     onProgress(`Scan Finalizado!`);
